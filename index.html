@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>$ Tracker</title>
+    
+    <!-- PWA & Apple iOS Home Screen Web App Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="$ Tracker">
+    <meta name="theme-color" content="#000000">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2910/2910248.png">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        iosBgLight: '#F2F2F7',
+                        iosCardLight: '#FFFFFF',
+                        iosBgDark: '#000000',
+                        iosCardDark: '#1C1C1E',
+                        iosCardElevatedDark: '#2C2C2E',
+                        iosBlue: '#007AFF',
+                        iosGreen: '#34C759',
+                        iosRed: '#FF3B30',
+                        iosOrange: '#FF9500',
+                        iosPurple: '#AF52DE',
+                        iosYellow: '#FFCC00',
+                    },
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"', '"Helvetica Neue"', 'Helvetica', 'Arial', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for Visual Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        ::-webkit-scrollbar {
+            width: 0px;
+            background: transparent;
+        }
+        body {
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .safe-area-bottom {
+            padding-bottom: max(env(safe-area-inset-bottom, 16px), 16px);
+        }
+        .safe-area-top {
+            padding-top: max(env(safe-area-inset-top, 20px), 20px);
+        }
+        .no-select {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+    </style>
+</head>
+<body class="h-full bg-iosBgLight dark:bg-iosBgDark text-slate-900 dark:text-slate-100 font-sans antialiased transition-colors duration-200">
+
+    <div id="app" class="max-w-md mx-auto h-full flex flex-col justify-between relative bg-iosBgLight dark:bg-iosBgDark overflow-hidden shadow-2xl">
+        
+        <!-- TOP HEADER BAR WITH MONTHLY SHEET NAVIGATION -->
+        <header class="safe-area-top px-4 pt-3 pb-3 flex flex-col border-b border-slate-200 dark:border-slate-800 bg-iosBgLight/90 dark:bg-iosBgDark/90 backdrop-blur-md sticky top-0 z-30 space-y-2.5">
+            
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-xl font-extrabold tracking-tight">$ Tracker</h1>
+                    <p class="text-[11px] font-medium text-slate-400">Monthly Spending Sheet</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="toggleDarkMode()" class="w-8 h-8 rounded-full bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center transition active:scale-90" title="Toggle Theme">
+                        <i class="fa-solid fa-moon dark:hidden text-xs"></i>
+                        <i class="fa-solid fa-sun hidden dark:inline text-amber-400 text-xs"></i>
+                    </button>
+                    <button onclick="openModal('install-modal')" class="w-8 h-8 rounded-full bg-iosBlue/10 text-iosBlue flex items-center justify-center transition active:scale-90" title="Download & Install App">
+                        <i class="fa-solid fa-arrow-down-to-line text-xs"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- MONTHLY SHEET SWITCHER -->
+            <div class="flex items-center justify-between bg-slate-200/70 dark:bg-slate-800/80 p-1.5 rounded-2xl">
+                <button onclick="navigateMonth(-1)" class="w-8 h-8 rounded-xl bg-iosCardLight dark:bg-iosCardDark shadow-sm flex items-center justify-center text-xs text-slate-700 dark:text-slate-200 active:scale-90 transition">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                
+                <div class="flex items-center gap-1.5 cursor-pointer active:opacity-70 transition" onclick="openModal('month-picker-modal')">
+                    <i class="fa-solid fa-calendar-days text-iosBlue text-xs"></i>
+                    <span id="active-month-label" class="font-bold text-xs uppercase tracking-wide">...</span>
+                    <i class="fa-solid fa-chevron-down text-[10px] text-slate-400 ml-0.5"></i>
+                </div>
+
+                <button onclick="navigateMonth(1)" class="w-8 h-8 rounded-xl bg-iosCardLight dark:bg-iosCardDark shadow-sm flex items-center justify-center text-xs text-slate-700 dark:text-slate-200 active:scale-90 transition">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+
+        </header>
+
+        <!-- MAIN SCROLLABLE CONTENT AREA -->
+        <main class="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+
+            <!-- MONTHLY BUDGET TARGET & PROGRESS -->
+            <section class="bg-iosCardLight dark:bg-iosCardDark p-4 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800/80 space-y-3">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Monthly Budget</span>
+                        <div class="flex items-center gap-1.5 mt-0.5">
+                            <span id="budget-target-display" class="text-lg font-extrabold text-slate-800 dark:text-slate-100">$0.00</span>
+                            <button onclick="openModal('budget-modal')" class="text-[11px] text-iosBlue bg-iosBlue/10 hover:bg-iosBlue/20 px-2.5 py-0.5 rounded-md font-semibold transition">Set Goal</button>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Remaining</span>
+                        <span id="budget-remaining-display" class="text-lg font-extrabold text-iosGreen">$0.00</span>
+                    </div>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="space-y-1.5">
+                    <div class="w-full bg-slate-200 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                        <div id="budget-progress-bar" class="bg-iosBlue h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                    <div class="flex justify-between text-[10px] text-slate-400 font-medium">
+                        <span id="budget-used-percent">0% spent</span>
+                        <span id="budget-status-text">On track</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- CASHFLOW SUMMARY CARDS -->
+            <section class="grid grid-cols-3 gap-2">
+                <div class="bg-iosCardLight dark:bg-iosCardDark p-3 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800/80 text-center">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Spent</span>
+                    <p id="total-expense" class="text-sm font-extrabold text-iosRed">$0.00</p>
+                </div>
+                <div class="bg-iosCardLight dark:bg-iosCardDark p-3 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800/80 text-center">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Income</span>
+                    <p id="total-income" class="text-sm font-extrabold text-iosGreen">$0.00</p>
+                </div>
+                <div class="bg-iosCardLight dark:bg-iosCardDark p-3 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800/80 text-center">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Net Cash</span>
+                    <p id="net-balance" class="text-sm font-extrabold text-slate-800 dark:text-slate-100">$0.00</p>
+                </div>
+            </section>
+
+            <!-- TAB VIEWS -->
+
+            <!-- VIEW 1: TRANSACTIONS LIST SHEET -->
+            <section id="view-transactions" class="space-y-3">
+                <!-- Search & Filters Bar -->
+                <div class="flex items-center gap-2">
+                    <div class="relative flex-1">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                        <input type="text" id="search-input" oninput="renderTransactions()" placeholder="Search this sheet..." class="w-full bg-slate-200/60 dark:bg-slate-800/80 pl-8 pr-3 py-1.5 rounded-xl text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-iosBlue">
+                    </div>
+                    <select id="filter-type" onchange="renderTransactions()" class="bg-slate-200/60 dark:bg-slate-800/80 px-2.5 py-1.5 rounded-xl text-xs font-semibold focus:outline-none text-slate-700 dark:text-slate-300">
+                        <option value="all">All Types</option>
+                        <option value="expense">Expense</option>
+                        <option value="income">Income</option>
+                    </select>
+                </div>
+
+                <!-- Transactions Log -->
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between px-1">
+                        <h2 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Sheet Log</h2>
+                        <span id="transaction-count" class="text-xs text-slate-400 font-medium">0 entries</span>
+                    </div>
+
+                    <div id="transactions-list" class="space-y-2">
+                        <!-- Dynamic transaction rows populate here -->
+                    </div>
+
+                    <div id="empty-state" class="hidden text-center py-10 space-y-2">
+                        <div class="w-12 h-12 rounded-full bg-slate-200/60 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto text-xl">
+                            <i class="fa-solid fa-receipt"></i>
+                        </div>
+                        <p class="text-slate-500 text-xs font-medium">No transactions in this sheet.<br>Tap <span class="text-iosBlue font-bold">+</span> below to log spending.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW 2: CATEGORY ANALYTICS SHEET -->
+            <section id="view-analytics" class="hidden space-y-3">
+                <div class="bg-iosCardLight dark:bg-iosCardDark p-4 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 space-y-2">
+                    <h2 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Monthly Breakdown</h2>
+                    <div class="relative w-full h-48 flex items-center justify-center">
+                        <canvas id="category-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-iosCardLight dark:bg-iosCardDark p-4 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 space-y-3">
+                    <h2 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Top Spending Categories</h2>
+                    <div id="category-breakdown-list" class="space-y-2.5">
+                        <!-- Category percentages populate here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW 3: RECEIPTS GALLERY SHEET -->
+            <section id="view-receipts" class="hidden space-y-3">
+                <div class="flex items-center justify-between px-1">
+                    <h2 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Sheet Receipt Gallery</h2>
+                    <span id="receipt-count" class="text-xs text-slate-400 font-medium">0 photos</span>
+                </div>
+                
+                <div id="receipts-grid" class="grid grid-cols-2 gap-3">
+                    <!-- Dynamic receipt image grid -->
+                </div>
+
+                <div id="receipts-empty-state" class="hidden text-center py-10 space-y-2">
+                    <div class="w-12 h-12 rounded-full bg-slate-200/60 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto text-xl">
+                        <i class="fa-solid fa-camera"></i>
+                    </div>
+                    <p class="text-slate-500 text-xs font-medium">No receipt photos added to this monthly sheet.</p>
+                </div>
+            </section>
+
+            <!-- VIEW 4: SETTINGS & EXPORT SHEET -->
+            <section id="view-settings" class="hidden space-y-4">
+                <div class="bg-iosCardLight dark:bg-iosCardDark rounded-3xl p-4 shadow-sm border border-slate-100 dark:border-slate-800 space-y-3">
+                    <h2 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Data & Backup Tools</h2>
+                    <p class="text-xs text-slate-400">All data and attached photos remain private and stored directly on your iPhone.</p>
+                    
+                    <div class="pt-1 space-y-2">
+                        <button onclick="exportCSV(false)" class="w-full py-2.5 px-4 bg-iosBlue/10 text-iosBlue rounded-2xl font-semibold text-xs flex items-center justify-between active:scale-98 transition">
+                            <span><i class="fa-solid fa-file-csv mr-2"></i> Export Current Sheet to CSV</span>
+                            <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                        </button>
+
+                        <button onclick="exportCSV(true)" class="w-full py-2.5 px-4 bg-iosBlue/10 text-iosBlue rounded-2xl font-semibold text-xs flex items-center justify-between active:scale-98 transition">
+                            <span><i class="fa-solid fa-file-csv mr-2"></i> Export All Months to CSV</span>
+                            <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                        </button>
+
+                        <button onclick="copyPreviousMonthSetup()" class="w-full py-2.5 px-4 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-2xl font-semibold text-xs flex items-center justify-between active:scale-98 transition">
+                            <span><i class="fa-solid fa-copy mr-2"></i> Copy Last Month's Budget Goal</span>
+                            <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                        </button>
+
+                        <button onclick="openModal('install-modal')" class="w-full py-2.5 px-4 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-2xl font-semibold text-xs flex items-center justify-between active:scale-98 transition">
+                            <span><i class="fa-brands fa-apple mr-2"></i> iPhone App Setup Guide</span>
+                            <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                        </button>
+
+                        <button onclick="confirmClearAll()" class="w-full py-2.5 px-4 bg-iosRed/10 text-iosRed rounded-2xl font-semibold text-xs flex items-center justify-between active:scale-98 transition">
+                            <span><i class="fa-solid fa-trash-can mr-2"></i> Reset All Saved Data</span>
+                            <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="text-center pt-2">
+                    <p class="text-xs text-slate-400 font-medium">$ Tracker App • Offline-First PWA</p>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- FLOATING ADD TRANSACTION BUTTON -->
+        <div class="px-4 pb-1 relative z-20 flex justify-center">
+            <button onclick="openAddTransactionModal()" class="w-13 h-13 bg-iosBlue text-white rounded-full shadow-lg flex items-center justify-center text-xl active:scale-90 transition-transform duration-150 border-4 border-iosBgLight dark:border-iosBgDark">
+                <i class="fa-solid fa-plus"></i>
+            </button>
+        </div>
+
+        <!-- BOTTOM TAB BAR -->
+        <nav class="safe-area-bottom bg-iosCardLight/90 dark:bg-iosCardDark/90 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 flex justify-around py-2 px-1 z-20">
+            <button onclick="switchTab('transactions')" id="tab-btn-transactions" class="flex flex-col items-center gap-1 text-iosBlue">
+                <i class="fa-solid fa-list-ul text-base"></i>
+                <span class="text-[10px] font-semibold">Activity</span>
+            </button>
+            <button onclick="switchTab('analytics')" id="tab-btn-analytics" class="flex flex-col items-center gap-1 text-slate-400">
+                <i class="fa-solid fa-chart-pie text-base"></i>
+                <span class="text-[10px] font-semibold">Analytics</span>
+            </button>
+            <button onclick="switchTab('receipts')" id="tab-btn-receipts" class="flex flex-col items-center gap-1 text-slate-400">
+                <i class="fa-solid fa-images text-base"></i>
+                <span class="text-[10px] font-semibold">Receipts</span>
+            </button>
+            <button onclick="switchTab('settings')" id="tab-btn-settings" class="flex flex-col items-center gap-1 text-slate-400">
+                <i class="fa-solid fa-gear text-base"></i>
+                <span class="text-[10px] font-semibold">Settings</span>
+            </button>
+        </nav>
+
+        <!-- MODAL 1: ADD TRANSACTION SHEET -->
+        <div id="transaction-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center hidden transition-opacity duration-200">
+            <div class="bg-iosCardLight dark:bg-iosCardDark w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+                <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                    <h3 class="text-base font-extrabold" id="modal-title">New Entry</h3>
+                    <button onclick="closeModal('transaction-modal')" class="text-slate-400 hover:text-slate-200 text-lg">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <form id="transaction-form" onsubmit="saveTransaction(event)" class="space-y-3.5">
+                    <!-- Income/Expense Switcher -->
+                    <div class="grid grid-cols-2 gap-2 p-1 bg-slate-200/70 dark:bg-slate-800/80 rounded-xl text-center font-bold text-xs">
+                        <button type="button" id="type-expense-btn" onclick="setTransactionType('expense')" class="py-2 rounded-lg bg-iosCardLight dark:bg-iosCardDark text-iosRed shadow-sm transition">Expense</button>
+                        <button type="button" id="type-income-btn" onclick="setTransactionType('income')" class="py-2 rounded-lg text-slate-500 transition">Income</button>
+                    </div>
+
+                    <!-- Amount Input -->
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Amount ($)</label>
+                        <input type="number" step="0.01" id="tx-amount" required placeholder="0.00" class="w-full text-2xl font-extrabold bg-slate-100 dark:bg-slate-800 px-3.5 py-2.5 rounded-xl border-none focus:ring-2 focus:ring-iosBlue focus:outline-none">
+                    </div>
+
+                    <!-- Category & Date Grid -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Category</label>
+                            <select id="tx-category" required class="w-full bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-iosBlue focus:outline-none">
+                                <!-- Categories populated dynamically -->
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Date</label>
+                            <input type="date" id="tx-date" required class="w-full bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-iosBlue focus:outline-none">
+                        </div>
+                    </div>
+
+                    <!-- Merchant Title -->
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Merchant / Description</label>
+                        <input type="text" id="tx-merchant" required placeholder="e.g. Target, Starbucks, Salary" class="w-full bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-xl text-xs font-medium focus:ring-2 focus:ring-iosBlue focus:outline-none">
+                    </div>
+
+                    <!-- Notes -->
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Notes (Optional)</label>
+                        <input type="text" id="tx-notes" placeholder="Additional details..." class="w-full bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-xl text-xs font-medium focus:ring-2 focus:ring-iosBlue focus:outline-none">
+                    </div>
+
+                    <!-- Camera & Receipt Photo Capture -->
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Attach Receipt</label>
+                        <div class="flex items-center gap-3">
+                            <label class="flex-1 cursor-pointer bg-slate-100 dark:bg-slate-800 border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-iosBlue p-2.5 rounded-xl text-center text-xs text-slate-500 font-semibold transition">
+                                <i class="fa-solid fa-camera mr-1 text-iosBlue"></i> Photo / Camera Upload
+                                <input type="file" id="tx-receipt-input" accept="image/*" capture="environment" onchange="handleReceiptSelect(event)" class="hidden">
+                            </label>
+                            <div id="receipt-preview-container" class="relative hidden w-11 h-11 rounded-lg overflow-hidden border border-slate-300">
+                                <img id="receipt-preview-img" class="w-full h-full object-cover">
+                                <button type="button" onclick="removeReceipt()" class="absolute top-0 right-0 bg-iosRed text-white text-[9px] w-4 h-4 rounded-bl flex items-center justify-center">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit -->
+                    <div class="pt-2">
+                        <button type="submit" class="w-full py-3 bg-iosBlue text-white font-bold text-xs rounded-xl shadow-md active:scale-98 transition">Save Entry</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- MODAL 2: MONTH SHEET SELECTOR -->
+        <div id="month-picker-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+            <div class="bg-iosCardLight dark:bg-iosCardDark w-full max-w-sm rounded-3xl p-5 space-y-4 shadow-2xl">
+                <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                    <h3 class="font-extrabold text-sm">Select Monthly Sheet</h3>
+                    <button onclick="closeModal('month-picker-modal')" class="text-slate-400 hover:text-slate-200">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Choose Month & Year</label>
+                        <input type="month" id="month-sheet-picker" class="w-full bg-slate-100 dark:bg-slate-800 px-3 py-2.5 rounded-xl text-xs font-bold focus:outline-none">
+                    </div>
+                    
+                    <button onclick="applyMonthPickerSelection()" class="w-full py-2.5 bg-iosBlue text-white font-bold text-xs rounded-xl">Open Sheet</button>
+
+                    <div class="border-t border-slate-200 dark:border-slate-800 pt-3">
+                        <button onclick="jumpToCurrentMonth()" class="w-full py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs rounded-xl">Go to Current Month</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL 3: EDIT BUDGET GOAL -->
+        <div id="budget-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+            <div class="bg-iosCardLight dark:bg-iosCardDark w-full max-w-sm rounded-3xl p-5 space-y-4 shadow-2xl">
+                <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                    <h3 class="font-extrabold text-sm">Set Monthly Budget Limit</h3>
+                    <button onclick="closeModal('budget-modal')" class="text-slate-400 hover:text-slate-200">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Spending Target ($)</label>
+                        <input type="number" step="10" id="budget-target-input" placeholder="e.g. 2000" class="w-full text-lg font-extrabold bg-slate-100 dark:bg-slate-800 px-3.5 py-2.5 rounded-xl focus:outline-none">
+                    </div>
+
+                    <button onclick="saveBudgetTarget()" class="w-full py-2.5 bg-iosBlue text-white font-bold text-xs rounded-xl">Save Target</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL 4: RECEIPT FULL IMAGE PREVIEW -->
+        <div id="receipt-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex flex-col items-center justify-center p-4 hidden">
+            <div class="relative max-w-sm w-full bg-iosCardLight dark:bg-iosCardDark p-2 rounded-2xl overflow-hidden shadow-2xl">
+                <button onclick="closeModal('receipt-modal')" class="absolute top-3 right-3 bg-black/60 text-white w-8 h-8 rounded-full flex items-center justify-center z-10">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+                <img id="full-receipt-img" class="w-full h-auto max-h-[75vh] object-contain rounded-xl">
+            </div>
+        </div>
+
+        <!-- MODAL 5: IPHONE INSTALLATION STEP-BY-STEP -->
+        <div id="install-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+            <div class="bg-iosCardLight dark:bg-iosCardDark w-full max-w-sm rounded-3xl p-5 space-y-4 shadow-2xl">
+                <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                    <h3 class="font-extrabold text-sm flex items-center gap-2">
+                        <i class="fa-brands fa-apple text-lg"></i> Download to iPhone
+                    </h3>
+                    <button onclick="closeModal('install-modal')" class="text-slate-400 hover:text-slate-200">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <div class="space-y-3 text-xs text-slate-600 dark:text-slate-300 font-medium">
+                    <div class="flex items-start gap-2.5">
+                        <span class="w-5 h-5 bg-iosBlue/10 text-iosBlue font-bold rounded-full flex items-center justify-center flex-shrink-0 text-[10px]">1</span>
+                        <span>Open this page in <strong>Safari</strong> on your iPhone.</span>
+                    </div>
+                    <div class="flex items-start gap-2.5">
+                        <span class="w-5 h-5 bg-iosBlue/10 text-iosBlue font-bold rounded-full flex items-center justify-center flex-shrink-0 text-[10px]">2</span>
+                        <span>Tap the <strong>Share</strong> icon <i class="fa-solid fa-arrow-up-from-bracket text-iosBlue"></i> in Safari's bottom toolbar.</span>
+                    </div>
+                    <div class="flex items-start gap-2.5">
+                        <span class="w-5 h-5 bg-iosBlue/10 text-iosBlue font-bold rounded-full flex items-center justify-center flex-shrink-0 text-[10px]">3</span>
+                        <span>Scroll down and select <strong>"Add to Home Screen"</strong>.</span>
+                    </div>
+                </div>
+
+                <button onclick="closeModal('install-modal')" class="w-full py-2.5 bg-iosBlue text-white font-bold text-xs rounded-xl">Got It</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const CATEGORIES = {
+            expense: [
+                { name: 'Food & Dining', icon: 'fa-utensils', color: 'bg-orange-500' },
+                { name: 'Groceries', icon: 'fa-cart-shopping', color: 'bg-emerald-500' },
+                { name: 'Transportation', icon: 'fa-car', color: 'bg-blue-500' },
+                { name: 'Shopping', icon: 'fa-bag-shopping', color: 'bg-pink-500' },
+                { name: 'Bills & Utilities', icon: 'fa-file-invoice-dollar', color: 'bg-purple-500' },
+                { name: 'Entertainment', icon: 'fa-film', color: 'bg-indigo-500' },
+                { name: 'Health & Fitness', icon: 'fa-heart-pulse', color: 'bg-red-500' },
+                { name: 'Other Expense', icon: 'fa-box', color: 'bg-slate-500' }
+            ],
+            income: [
+                { name: 'Salary', icon: 'fa-money-bill-wave', color: 'bg-green-500' },
+                { name: 'Freelance', icon: 'fa-laptop', color: 'bg-teal-500' },
+                { name: 'Investments', icon: 'fa-chart-line', color: 'bg-cyan-500' },
+                { name: 'Other Income', icon: 'fa-vault', color: 'bg-amber-500' }
+            ]
+        };
+
+        // State Management
+        let transactions = JSON.parse(localStorage.getItem('dollar_tracker_data') || '[]');
+        let monthlyBudgets = JSON.parse(localStorage.getItem('dollar_tracker_budgets') || '{}');
+        
+        // Active Month Key formatted as "YYYY-MM"
+        let activeMonthKey = getYearMonthString(new Date()); 
+        let currentType = 'expense';
+        let currentReceiptBase64 = null;
+        let chartInstance = null;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            populateCategories();
+            updateActiveMonthUI();
+            initDarkMode();
+            document.getElementById('tx-date').valueAsDate = new Date();
+        });
+
+        function getYearMonthString(dateObj) {
+            const year = dateObj.getFullYear();
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            return `${year}-${month}`;
+        }
+
+        function navigateMonth(direction) {
+            const [y, m] = activeMonthKey.split('-').map(Number);
+            const date = new Date(y, m - 1 + direction, 1);
+            activeMonthKey = getYearMonthString(date);
+            updateActiveMonthUI();
+        }
+
+        function applyMonthPickerSelection() {
+            const val = document.getElementById('month-sheet-picker').value;
+            if (val) {
+                activeMonthKey = val;
+                updateActiveMonthUI();
+                closeModal('month-picker-modal');
+            }
+        }
+
+        function jumpToCurrentMonth() {
+            activeMonthKey = getYearMonthString(new Date());
+            updateActiveMonthUI();
+            closeModal('month-picker-modal');
+        }
+
+        function updateActiveMonthUI() {
+            const [y, m] = activeMonthKey.split('-').map(Number);
+            const dateObj = new Date(y, m - 1, 1);
+            const monthLabel = dateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            
+            document.getElementById('active-month-label').innerText = monthLabel;
+            document.getElementById('month-sheet-picker').value = activeMonthKey;
+
+            renderTransactions();
+            renderReceiptsGallery();
+            if (!document.getElementById('view-analytics').classList.contains('hidden')) {
+                renderAnalytics();
+            }
+        }
+
+        function switchTab(tabName) {
+            ['transactions', 'analytics', 'receipts', 'settings'].forEach(tab => {
+                document.getElementById(`view-${tab}`).classList.add('hidden');
+                document.getElementById(`tab-btn-${tab}`).classList.remove('text-iosBlue');
+                document.getElementById(`tab-btn-${tab}`).classList.add('text-slate-400');
+            });
+
+            document.getElementById(`view-${tabName}`).classList.remove('hidden');
+            document.getElementById(`tab-btn-${tabName}`).classList.add('text-iosBlue');
+            document.getElementById(`tab-btn-${tabName}`).classList.remove('text-slate-400');
+
+            if (tabName === 'analytics') {
+                renderAnalytics();
+            } else if (tabName === 'receipts') {
+                renderReceiptsGallery();
+            }
+        }
+
+        function initDarkMode() {
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.classList.add('dark');
+            }
+        }
+
+        function toggleDarkMode() {
+            document.documentElement.classList.toggle('dark');
+        }
+
+        function openAddTransactionModal() {
+            document.getElementById('transaction-form').reset();
+            
+            const [y, m] = activeMonthKey.split('-').map(Number);
+            const now = new Date();
+            if (now.getFullYear() === y && (now.getMonth() + 1) === m) {
+                document.getElementById('tx-date').valueAsDate = now;
+            } else {
+                document.getElementById('tx-date').value = `${activeMonthKey}-01`;
+            }
+
+            setTransactionType('expense');
+            removeReceipt();
+            openModal('transaction-modal');
+        }
+
+        function setTransactionType(type) {
+            currentType = type;
+            const expBtn = document.getElementById('type-expense-btn');
+            const incBtn = document.getElementById('type-income-btn');
+
+            if (type === 'expense') {
+                expBtn.className = "py-2 rounded-lg bg-iosCardLight dark:bg-iosCardDark text-iosRed shadow-sm transition font-bold";
+                incBtn.className = "py-2 rounded-lg text-slate-500 transition font-normal";
+            } else {
+                incBtn.className = "py-2 rounded-lg bg-iosCardLight dark:bg-iosCardDark text-iosGreen shadow-sm transition font-bold";
+                expBtn.className = "py-2 rounded-lg text-slate-500 transition font-normal";
+            }
+            populateCategories();
+        }
+
+        function populateCategories() {
+            const select = document.getElementById('tx-category');
+            select.innerHTML = '';
+            CATEGORIES[currentType].forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat.name;
+                opt.textContent = cat.name;
+                select.appendChild(opt);
+            });
+        }
+
+        function handleReceiptSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 600;
+                    const scaleSize = MAX_WIDTH / img.width;
+                    canvas.width = MAX_WIDTH;
+                    canvas.height = img.height * scaleSize;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                    currentReceiptBase64 = canvas.toDataURL('image/jpeg', 0.6);
+                    document.getElementById('receipt-preview-img').src = currentReceiptBase64;
+                    document.getElementById('receipt-preview-container').classList.remove('hidden');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeReceipt() {
+            currentReceiptBase64 = null;
+            document.getElementById('tx-receipt-input').value = '';
+            document.getElementById('receipt-preview-container').classList.add('hidden');
+        }
+
+        function saveTransaction(e) {
+            e.preventDefault();
+
+            const amount = parseFloat(document.getElementById('tx-amount').value);
+            const category = document.getElementById('tx-category').value;
+            const date = document.getElementById('tx-date').value;
+            const merchant = document.getElementById('tx-merchant').value;
+            const notes = document.getElementById('tx-notes').value;
+
+            if (!amount || isNaN(amount)) return;
+
+            const monthKey = date.substring(0, 7);
+
+            const newTx = {
+                id: Date.now().toString(),
+                monthKey: monthKey,
+                type: currentType,
+                amount: amount,
+                category: category,
+                date: date,
+                merchant: merchant,
+                notes: notes,
+                receipt: currentReceiptBase64
+            };
+
+            transactions.unshift(newTx);
+            localStorage.setItem('dollar_tracker_data', JSON.stringify(transactions));
+
+            activeMonthKey = monthKey;
+            updateActiveMonthUI();
+            closeModal('transaction-modal');
+        }
+
+        function deleteTransaction(id) {
+            transactions = transactions.filter(t => t.id !== id);
+            localStorage.setItem('dollar_tracker_data', JSON.stringify(transactions));
+            renderTransactions();
+            renderReceiptsGallery();
+        }
+
+        function saveBudgetTarget() {
+            const targetVal = parseFloat(document.getElementById('budget-target-input').value) || 0;
+            monthlyBudgets[activeMonthKey] = targetVal;
+            localStorage.setItem('dollar_tracker_budgets', JSON.stringify(monthlyBudgets));
+            closeModal('budget-modal');
+            renderTransactions();
+        }
+
+        function copyPreviousMonthSetup() {
+            const [y, m] = activeMonthKey.split('-').map(Number);
+            const prevDate = new Date(y, m - 2, 1);
+            const prevKey = getYearMonthString(prevDate);
+            const prevBudget = monthlyBudgets[prevKey] || 0;
+
+            if (prevBudget > 0) {
+                monthlyBudgets[activeMonthKey] = prevBudget;
+                localStorage.setItem('dollar_tracker_budgets', JSON.stringify(monthlyBudgets));
+                renderTransactions();
+                alert(`Copied previous month budget ($${prevBudget.toFixed(2)}) to this sheet.`);
+            } else {
+                alert('No budget target set in the previous month to copy.');
+            }
+        }
+
+        function renderTransactions() {
+            const listEl = document.getElementById('transactions-list');
+            const searchVal = document.getElementById('search-input').value.toLowerCase();
+            const filterType = document.getElementById('filter-type').value;
+
+            const activeMonthTransactions = transactions.filter(t => t.monthKey === activeMonthKey);
+
+            let filtered = activeMonthTransactions.filter(t => {
+                const matchesSearch = t.merchant.toLowerCase().includes(searchVal) || 
+                                      (t.notes && t.notes.toLowerCase().includes(searchVal)) ||
+                                      t.category.toLowerCase().includes(searchVal);
+                const matchesType = filterType === 'all' || t.type === filterType;
+                return matchesSearch && matchesType;
+            });
+
+            // Totals
+            let totalExp = 0;
+            let totalInc = 0;
+            activeMonthTransactions.forEach(t => {
+                if (t.type === 'expense') totalExp += t.amount;
+                else totalInc += t.amount;
+            });
+
+            document.getElementById('total-expense').innerText = `$${totalExp.toFixed(2)}`;
+            document.getElementById('total-income').innerText = `$${totalInc.toFixed(2)}`;
+            const net = totalInc - totalExp;
+            const netEl = document.getElementById('net-balance');
+            netEl.innerText = `$${net.toFixed(2)}`;
+            netEl.className = `text-sm font-extrabold ${net >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-iosRed'}`;
+
+            // Monthly Budget Calculations
+            const currentBudget = monthlyBudgets[activeMonthKey] || 0;
+            document.getElementById('budget-target-display').innerText = `$${currentBudget.toFixed(2)}`;
+            document.getElementById('budget-target-input').value = currentBudget || '';
+
+            const remaining = currentBudget - totalExp;
+            const remainingEl = document.getElementById('budget-remaining-display');
+            remainingEl.innerText = `$${remaining.toFixed(2)}`;
+            remainingEl.className = `text-lg font-extrabold ${remaining >= 0 ? 'text-iosGreen' : 'text-iosRed'}`;
+
+            const percentUsed = currentBudget > 0 ? Math.min(Math.round((totalExp / currentBudget) * 100), 100) : 0;
+            const progressBar = document.getElementById('budget-progress-bar');
+            progressBar.style.width = `${percentUsed}%`;
+
+            if (totalExp > currentBudget && currentBudget > 0) {
+                progressBar.className = "bg-iosRed h-full rounded-full transition-all duration-300";
+                document.getElementById('budget-status-text').innerText = "Over budget";
+                document.getElementById('budget-status-text').className = "text-iosRed font-semibold";
+            } else {
+                progressBar.className = "bg-iosBlue h-full rounded-full transition-all duration-300";
+                document.getElementById('budget-status-text').innerText = "On track";
+                document.getElementById('budget-status-text').className = "text-slate-400 font-semibold";
+            }
+            document.getElementById('budget-used-percent').innerText = `${percentUsed}% spent`;
+
+            document.getElementById('transaction-count').innerText = `${filtered.length} entries`;
+
+            if (filtered.length === 0) {
+                listEl.innerHTML = '';
+                document.getElementById('empty-state').classList.remove('hidden');
+                return;
+            } else {
+                document.getElementById('empty-state').classList.add('hidden');
+            }
+
+            listEl.innerHTML = filtered.map(t => {
+                const catObj = [...CATEGORIES.expense, ...CATEGORIES.income].find(c => c.name === t.category) || { icon: 'fa-receipt', color: 'bg-slate-500' };
+                const isExpense = t.type === 'expense';
+
+                return `
+                    <div class="bg-iosCardLight dark:bg-iosCardDark p-3 rounded-2xl flex items-center justify-between shadow-sm border border-slate-100 dark:border-slate-800/80">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-full ${catObj.color} text-white flex items-center justify-center text-xs flex-shrink-0">
+                                <i class="fa-solid ${catObj.icon}"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-xs leading-tight">${escapeHtml(t.merchant)}</h3>
+                                <p class="text-[10px] font-medium text-slate-400 mt-0.5">${t.category} • ${t.date}</p>
+                                ${t.notes ? `<p class="text-[10px] text-slate-400 italic">${escapeHtml(t.notes)}</p>` : ''}
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            ${t.receipt ? `
+                                <button onclick="viewReceipt('${t.receipt}')" class="w-6 h-6 bg-iosBlue/10 text-iosBlue rounded-lg flex items-center justify-center text-[10px]" title="View Receipt">
+                                    <i class="fa-solid fa-paperclip"></i>
+                                </button>
+                            ` : ''}
+                            <div class="text-right">
+                                <span class="font-extrabold text-xs ${isExpense ? 'text-iosRed' : 'text-iosGreen'}">
+                                    ${isExpense ? '-' : '+'}$${t.amount.toFixed(2)}
+                                </span>
+                            </div>
+                            <button onclick="deleteTransaction('${t.id}')" class="text-slate-300 hover:text-iosRed text-xs ml-1 p-1">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderAnalytics() {
+            const categoryTotals = {};
+            let totalExp = 0;
+
+            transactions.filter(t => t.monthKey === activeMonthKey && t.type === 'expense').forEach(t => {
+                categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
+                totalExp += t.amount;
+            });
+
+            const labels = Object.keys(categoryTotals);
+            const data = Object.values(categoryTotals);
+
+            const breakdownEl = document.getElementById('category-breakdown-list');
+            if (labels.length === 0) {
+                breakdownEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">No expense entries in this monthly sheet.</p>';
+            } else {
+                breakdownEl.innerHTML = labels.map(cat => {
+                    const amount = categoryTotals[cat];
+                    const percentage = totalExp > 0 ? ((amount / totalExp) * 100).toFixed(1) : 0;
+                    return `
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-xs font-bold">
+                                <span>${cat}</span>
+                                <span>$${amount.toFixed(2)} (${percentage}%)</span>
+                            </div>
+                            <div class="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                                <div class="bg-iosBlue h-full rounded-full" style="width: ${percentage}%"></div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            const ctx = document.getElementById('category-chart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+
+            chartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels.length ? labels : ['No Expenses'],
+                    datasets: [{
+                        data: data.length ? data : [1],
+                        backgroundColor: [
+                            '#FF9500', '#34C759', '#007AFF', '#FF2D55', '#AF52DE', '#5856D6', '#FFCC00', '#8E8E93'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10, weight: 'bold' } } }
+                    }
+                }
+            });
+        }
+
+        function renderReceiptsGallery() {
+            const gridEl = document.getElementById('receipts-grid');
+            const receiptsList = transactions.filter(t => t.monthKey === activeMonthKey && t.receipt);
+
+            document.getElementById('receipt-count').innerText = `${receiptsList.length} photos`;
+
+            if (receiptsList.length === 0) {
+                gridEl.innerHTML = '';
+                document.getElementById('receipts-empty-state').classList.remove('hidden');
+                return;
+            } else {
+                document.getElementById('receipts-empty-state').classList.add('hidden');
+            }
+
+            gridEl.innerHTML = receiptsList.map(t => {
+                return `
+                    <div onclick="viewReceipt('${t.receipt}')" class="bg-iosCardLight dark:bg-iosCardDark rounded-2xl overflow-hidden shadow-sm border border-slate-100 dark:border-slate-800 cursor-pointer group">
+                        <div class="h-32 w-full overflow-hidden relative">
+                            <img src="${t.receipt}" class="w-full h-full object-cover group-hover:scale-105 transition-transform">
+                            <div class="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                                $${t.amount.toFixed(2)}
+                            </div>
+                        </div>
+                        <div class="p-2">
+                            <p class="font-bold text-xs truncate">${escapeHtml(t.merchant)}</p>
+                            <p class="text-[10px] text-slate-400 font-medium">${t.date}</p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function viewReceipt(base64Img) {
+            document.getElementById('full-receipt-img').src = base64Img;
+            openModal('receipt-modal');
+        }
+
+        function exportCSV(exportAll = false) {
+            const targetTxs = exportAll ? transactions : transactions.filter(t => t.monthKey === activeMonthKey);
+
+            if (targetTxs.length === 0) {
+                alert('No transaction records available to export.');
+                return;
+            }
+
+            let csv = 'ID,MonthSheet,Type,Date,Merchant,Category,Amount,Notes\n';
+            targetTxs.forEach(t => {
+                csv += `"${t.id}","${t.monthKey}","${t.type}","${t.date}","${escapeCsv(t.merchant)}","${escapeCsv(t.category)}",${t.amount},"${escapeCsv(t.notes || '')}"\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = exportAll ? `dollar_tracker_all.csv` : `dollar_tracker_${activeMonthKey}.csv`;
+            a.click();
+        }
+
+        function confirmClearAll() {
+            if (confirm('Are you sure you want to permanently reset all saved app sheets and transactions?')) {
+                localStorage.removeItem('dollar_tracker_data');
+                localStorage.removeItem('dollar_tracker_budgets');
+                transactions = [];
+                monthlyBudgets = {};
+                renderTransactions();
+                renderReceiptsGallery();
+                alert('All data erased.');
+            }
+        }
+
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/[&<>"']/g, function(m) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+            });
+        }
+
+        function escapeCsv(str) {
+            return str.replace(/"/g, '""');
+        }
+    </script>
+</body>
+</html>
